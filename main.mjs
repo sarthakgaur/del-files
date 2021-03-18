@@ -3,14 +3,33 @@ import Path from 'path';
 
 // TODO List the directory supplied by the user. Done.
 // TODO If node_modules directory is found, notify the user. Done.
+// TODO Parse the command line arguments. Done.
+// TODO Add option to recursively search directories.
 
-function getPath() {
-  const path = process.argv[2];
-  if (!path) {
-    console.error('Error: Path not provided.');
-    process.exit(1);
+function parseArgs(args) {
+  const config = {};
+
+  for (const arg of args) {
+    if (arg[0] === '-') {
+      for (const char of arg) {
+        if (char === 'r') {
+          config.recurse = true;
+        } else if (char === 'c') {
+          config.confirm = true;
+        }
+      }
+    } else if (!config.path) {
+      config.path = arg;
+    } else {
+      throw new Error('Invalid arguments supplied.')
+    }
   }
-  return path;
+
+  if (!config.path) {
+    throw new Error('Path not provided.');
+  }
+
+  return config;
 }
 
 async function getDirectoryList(path) {
@@ -30,13 +49,14 @@ async function isNodeModules(path, name) {
 
 async function main() {
   try {
-    const path = getPath();
-    const directoryList = await getDirectoryList(path);
+    const config = parseArgs(process.argv.slice(2));
+    const directoryList = await getDirectoryList(config.path);
+    console.log(config);
     console.log(directoryList);
 
     for (const dirent of directoryList) {
-      if (await isNodeModules(path, dirent.name)) {
-        console.log(`node_modules directory found: ${Path.join(path, dirent.name)}`);
+      if (await isNodeModules(config.path, dirent.name)) {
+        console.log(`node_modules directory found: ${Path.join(config.path, dirent.name)}`);
       }
     }
   } catch (err) {
