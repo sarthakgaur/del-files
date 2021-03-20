@@ -9,7 +9,8 @@ import path from 'path';
 // TODO Add option to recursively search directories. Done.
 // TODO Prompt the user before deleting the directory. Done.
 // TODO Add support for removing any directory or file. Done.
-// TODO Add support for removing multiple directories or files.
+// TODO Add support for removing multiple directories or files. Done.
+// TODO Add list of file/directory names to exclude from search.
 
 const rl = readLine.createInterface({
   input: process.stdin,
@@ -17,7 +18,9 @@ const rl = readLine.createInterface({
 });
 
 function parseArgs(args) {
-  const config = {};
+  const config = {
+    targets: new Set()
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -37,10 +40,8 @@ function parseArgs(args) {
           }
         }
       }
-    } else if (!config.target) {
-      config.target = arg;
     } else {
-      throw new Error('Invalid arguments supplied.')
+      config.targets.add(arg);
     }
   }
 
@@ -48,7 +49,7 @@ function parseArgs(args) {
     config.path = os.homedir();
   }
 
-  if (!config.target) {
+  if (!config.targets.size) {
     throw new Error('Target file/directory not provided.')
   }
 
@@ -94,7 +95,7 @@ async function main() {
   try {
     const config = parseArgs(process.argv.slice(2));
     const paths = [config.path];
-    const dirsToRemove = [];
+    const targetPaths = [];
 
     for (let i = 0; i < paths.length; i++) {
       const directoryList = await getDirectoryList(paths[i]);
@@ -102,21 +103,24 @@ async function main() {
       for (const dirent of directoryList) {
         const fullPath = path.join(paths[i], dirent.name);
 
-        if (dirent.name === config.target) {
-          console.log(`Target file/directory found: ${fullPath}`);
-          dirsToRemove.push(fullPath);
+        if (config.targets.has(dirent.name)) {
+          targetPaths.push(fullPath);
         }
 
         if (dirent.isDirectory()
           && config.recurse
-          && dirent.name !== config.target) {
+          && !config.targets.has(dirent.name)) {
           paths.push(fullPath);
         }
       }
     }
 
-    for (const dirToRemove of dirsToRemove) {
-      await handleTargetRemoval(config, dirToRemove);
+    for (const targetPath of targetPaths) {
+      await handleTargetRemoval(config, targetPath);
+    }
+
+    if (!targetPaths.length) {
+      console.log('Target file/directory not found.');
     }
   } catch (err) {
     console.error(err);
