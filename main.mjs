@@ -1,5 +1,6 @@
-import { opendir, lstat, rm } from 'fs/promises';
+import fs from 'fs/promises';
 import readLine from 'readline';
+import os from 'os';
 import path from 'path';
 
 // TODO List the directory supplied by the user. Done.
@@ -7,7 +8,8 @@ import path from 'path';
 // TODO Parse the command line arguments. Done.
 // TODO Add option to recursively search directories. Done.
 // TODO Prompt the user before deleting the directory. Done.
-// TODO Add support for removing any directory or file.
+// TODO Add support for removing any directory or file. Done.
+// TODO Add support for removing multiple directories or files.
 
 const rl = readLine.createInterface({
   input: process.stdin,
@@ -17,22 +19,37 @@ const rl = readLine.createInterface({
 function parseArgs(args) {
   const config = {};
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
     if (arg[0] === '-') {
       for (const char of arg) {
         if (char === 'r') {
           config.recurse = true;
+        } else if (char === 'y') {
+          config.skipConfirmation = true;
+        } else if (char === 'd') {
+          const nextArg = args[i + 1];
+          if (nextArg && nextArg[0] !== '-') {
+            config.path = nextArg;
+            i++;
+            break;
+          }
         }
       }
-    } else if (!config.path) {
-      config.path = arg;
+    } else if (!config.target) {
+      config.target = arg;
     } else {
       throw new Error('Invalid arguments supplied.')
     }
   }
 
   if (!config.path) {
-    throw new Error('Path not provided.');
+    config.path = os.homedir();
+  }
+
+  if (!config.target) {
+    throw new Error('Target file/directory not provided.')
   }
 
   return config;
@@ -40,32 +57,35 @@ function parseArgs(args) {
 
 async function getDirectoryList(path) {
   const directoryList = [];
-  const dir = await opendir(path);
+  const dir = await fs.opendir(path);
   for await (const dirent of dir) {
     directoryList.push(dirent);
   }
   return directoryList;
 }
 
-async function isNodeModules(path, name) {
-  const stat = await lstat(path);
-  return stat.isDirectory() && name === 'node_modules';
+async function removeTargetObject(path) {
+  try {
+    await fs.rm(path, { recursive: true });
+    console.log(`File/Directory ${path} deleted successfully`);
+  } catch (e) {
+    console.error(`Failed to delete file/directory ${path}. Reason ${e}`);
+  }
 }
 
-function removeDirectory(path) {
-  return new Promise((resolve, reject) => {
-    rl.question(`Remove directory: ${path} [y/n]? `, (input) => {
+function handleTargetRemoval(config, path) {
+  if (config.skipConfirmation) {
+    return removeTargetObject(path);
+  }
+
+  return new Promise((resolve) => {
+    rl.question(`Remove file/directory ${path} [y/n]? `, async (input) => {
       if (input === 'y') {
-        rm(path, { recursive: true })
-          .then(() => {
-            console.log(`Directory ${path} deleted successfully`);
-          }).catch((e) => {
-            console.error(`Failed to delete directory ${path}. Reason ${e}`);
-          });
+        await removeTargetObject(path);
       } else {
-        console.log(`Skipping directory: ${path}`);
+        console.log(`Skipping file/directory ${path}`);
       }
-      resolve(undefined);
+      resolve();
     });
   });
 }
@@ -82,27 +102,26 @@ async function main() {
       for (const dirent of directoryList) {
         const fullPath = path.join(paths[i], dirent.name);
 
-        if (await isNodeModules(fullPath, dirent.name)) {
-          console.log(`node_modules directory found: ${fullPath}`);
+        if (dirent.name === config.target) {
+          console.log(`Target file/directory found: ${fullPath}`);
           dirsToRemove.push(fullPath);
         }
 
         if (dirent.isDirectory()
           && config.recurse
-          && dirent.name !== 'node_modules'
-          && dirent.name !== '.git') {
+          && dirent.name !== config.target) {
           paths.push(fullPath);
         }
       }
     }
 
     for (const dirToRemove of dirsToRemove) {
-      await removeDirectory(dirToRemove);
+      await handleTargetRemoval(config, dirToRemove);
     }
-
-    rl.close();
   } catch (err) {
     console.error(err);
+  } finally {
+    rl.close();
   }
 }
 
