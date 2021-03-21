@@ -116,12 +116,14 @@ async function main() {
       }
     }
 
-    for (const targetPath of targetPaths) {
-      await handleTargetRemoval(config, targetPath);
+    if (targetPaths.length) {
+      console.log(`${targetPaths.length} target(s) found.`);
+    } else {
+      console.log('Target file/directory not found.');
     }
 
-    if (!targetPaths.length) {
-      console.log('Target file/directory not found.');
+    for (const targetPath of targetPaths) {
+      await handleTargetRemoval(config, targetPath);
     }
   } catch (err) {
     console.error(err);
