@@ -10,7 +10,7 @@ import path from 'path';
 // TODO Prompt the user before deleting the directory. Done.
 // TODO Add support for removing any directory or file. Done.
 // TODO Add support for removing multiple directories or files. Done.
-// TODO Add list of file/directory names to exclude from search.
+// TODO Add list of file/directory names to exclude from search. Done.
 
 const rl = readLine.createInterface({
   input: process.stdin,
@@ -19,7 +19,8 @@ const rl = readLine.createInterface({
 
 function parseArgs(args) {
   const config = {
-    targets: new Set()
+    targets: new Set(),
+    excludeList: new Set()
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -38,6 +39,13 @@ function parseArgs(args) {
             i++;
             break;
           }
+        } else if (char === 'e') {
+          let nextArg = args[++i];
+          while (nextArg && nextArg[0] !== '-') {
+            config.excludeList.add(nextArg);
+            nextArg = args[++i];
+          }
+          i--;
         }
       }
     } else {
@@ -109,7 +117,8 @@ async function main() {
 
         if (dirent.isDirectory()
           && config.recurse
-          && !config.targets.has(dirent.name)) {
+          && !config.targets.has(dirent.name)
+          && !config.excludeList.has(dirent.name)) {
           paths.push(fullPath);
         }
       }
