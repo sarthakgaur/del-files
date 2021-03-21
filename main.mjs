@@ -41,11 +41,12 @@ function parseArgs(args) {
           }
         } else if (char === 'e') {
           let nextArg = args[++i];
-          while (nextArg && nextArg[0] !== '-') {
+          while (nextArg?.[0] !== '-') {
             config.excludeList.add(nextArg);
             nextArg = args[++i];
           }
           i--;
+          break;
         }
       }
     } else {
@@ -64,19 +65,10 @@ function parseArgs(args) {
   return config;
 }
 
-async function getDirectoryList(path) {
-  const directoryList = [];
-  const dir = await fs.opendir(path);
-  for await (const dirent of dir) {
-    directoryList.push(dirent);
-  }
-  return directoryList;
-}
-
 async function removeTargetObject(path) {
   try {
     await fs.rm(path, { recursive: true });
-    console.log(`File/Directory ${path} deleted successfully`);
+    console.log(`File/Directory ${path} deleted successfully.`);
   } catch (e) {
     console.error(`Failed to delete file/directory ${path}. Reason ${e}`);
   }
@@ -106,9 +98,9 @@ async function main() {
     const targetPaths = [];
 
     for (let i = 0; i < paths.length; i++) {
-      const directoryList = await getDirectoryList(paths[i]);
+      const directoryList = await fs.opendir(paths[i]);
 
-      for (const dirent of directoryList) {
+      for await (const dirent of directoryList) {
         const fullPath = path.join(paths[i], dirent.name);
 
         if (config.targets.has(dirent.name)) {
