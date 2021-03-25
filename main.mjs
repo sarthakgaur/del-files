@@ -11,6 +11,7 @@ import path from 'path';
 // TODO Add support for removing any directory or file. Done.
 // TODO Add support for removing multiple directories or files. Done.
 // TODO Add list of file/directory names to exclude from search. Done.
+// TODO Add summary after finishing.
 
 const rl = readLine.createInterface({
   input: process.stdin,
@@ -41,7 +42,7 @@ function parseArgs(args) {
           }
         } else if (char === 'e') {
           let nextArg = args[++i];
-          while (nextArg?.[0] !== '-') {
+          while (nextArg && nextArg[0] !== '-') {
             config.excludeList.add(nextArg);
             nextArg = args[++i];
           }
