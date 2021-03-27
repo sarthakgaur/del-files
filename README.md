@@ -10,6 +10,7 @@ Delete files and directories from the command line.
 2. `-e`: Specify the directories to exclude from the search.
 3. `-y`: Skip the confirmation when deleting the file/directory.
 4. `-r`: Search recursively for files/directories.
+5. `-s`: Output the disk space freed.
 
 ## Example Usage
 
