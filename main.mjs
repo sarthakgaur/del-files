@@ -84,10 +84,10 @@ async function getAllFilesPath(dirPath) {
     for await (const dirent of directoryList) {
       const fullPath = path.join(paths[i], dirent.name);
 
-      if (dirent.isFile()) {
-        filePaths.push(fullPath);
-      } else {
+      if (dirent.isDirectory()) {
         paths.push(fullPath);
+      } else {
+        filePaths.push(fullPath);
       }
     }
   }
