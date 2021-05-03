@@ -1,50 +1,67 @@
-import fs from 'fs/promises';
-import readLine from 'readline';
-import os from 'os';
-import path from 'path';
+import fs from "fs/promises";
+import readLine from "readline";
+import path from "path";
 
 // TODO List the directory supplied by the user. Done.
 // TODO If node_modules directory is found, notify the user. Done.
 // TODO Parse the command line arguments. Done.
 // TODO Add option to recursively search directories. Done.
 // TODO Prompt the user before deleting the directory. Done.
-// TODO Add support for removing any directory or file. Done.
-// TODO Add support for removing multiple directories or files. Done.
+// TODO Add support for removing any directory or file. Done.  // TODO Add support for removing multiple directories or files. Done.
 // TODO Add list of file/directory names to exclude from search. Done.
 // TODO Ouput storage space freed. Done.
+// TODO Ported the script to TypeScript. Done.
+
+interface Config {
+  path: string;
+  targets: Set<string>;
+  excludeList: Set<string>;
+  recurse: boolean;
+  skipConfirmation: boolean;
+  getSize: boolean;
+}
+
+interface Operation {
+  size?: number;
+  isSuccess?: boolean;
+}
 
 const rl = readLine.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
-function parseArgs(args) {
-  const config = {
+function parseArgs(args: Array<string>) {
+  const config: Config = {
+    path: "",
     targets: new Set(),
-    excludeList: new Set()
+    excludeList: new Set(),
+    recurse: false,
+    skipConfirmation: false,
+    getSize: false,
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg[0] === '-') {
+    if (arg[0] === "-") {
       for (const char of arg) {
-        if (char === 'r') {
+        if (char === "r") {
           config.recurse = true;
-        } else if (char === 'y') {
+        } else if (char === "y") {
           config.skipConfirmation = true;
-        } else if (char === 's') {
+        } else if (char === "s") {
           config.getSize = true;
-        } else if (char === 'd') {
+        } else if (char === "d") {
           const nextArg = args[i + 1];
-          if (nextArg && nextArg[0] !== '-') {
+          if (nextArg && nextArg[0] !== "-") {
             config.path = nextArg;
             i++;
             break;
           }
-        } else if (char === 'e') {
+        } else if (char === "e") {
           let nextArg = args[++i];
-          while (nextArg && nextArg[0] !== '-') {
+          while (nextArg && nextArg[0] !== "-") {
             config.excludeList.add(nextArg);
             nextArg = args[++i];
           }
@@ -58,11 +75,11 @@ function parseArgs(args) {
   }
 
   if (!config.path) {
-    config.path = os.homedir();
+    throw new Error("Target path not provided.");
   }
 
   if (!config.targets.size) {
-    throw new Error('Target file/directory not provided.')
+    throw new Error("Target file/directory not provided.");
   }
 
   config.targets.forEach(config.excludeList.add, config.excludeList);
@@ -70,9 +87,9 @@ function parseArgs(args) {
   return config;
 }
 
-async function getAllFilesPath(dirPath) {
+async function getAllFilesPath(dirPath: string) {
   const paths = [dirPath];
-  const filePaths = [];
+  const filePaths: Array<string> = [];
 
   if ((await fs.stat(dirPath)).isFile()) {
     return [dirPath];
@@ -95,7 +112,7 @@ async function getAllFilesPath(dirPath) {
   return filePaths;
 }
 
-async function getDirSize(dirPath) {
+async function getDirSize(dirPath: string) {
   let totalSize = 0;
   const filePaths = await getAllFilesPath(dirPath);
 
@@ -106,18 +123,19 @@ async function getDirSize(dirPath) {
   return totalSize;
 }
 
-function convertBytes(bytes) {
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+function convertBytes(bytes: number) {
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
 
   if (bytes == 0) {
     return "0 Bytes";
   }
 
-  const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+  const num = Math.floor(Math.log(bytes) / Math.log(1024));
+  const i = parseInt(num.toString());
   return (bytes / Math.pow(1024, i)).toFixed(1) + " " + sizes[i];
 }
 
-async function removeTargetObject(path) {
+async function removeTargetObject(path: string) {
   try {
     await fs.rm(path, { recursive: true });
     console.log(`File/Directory ${path} deleted successfully.`);
@@ -128,8 +146,12 @@ async function removeTargetObject(path) {
   }
 }
 
-async function handleTargetRemoval(getSize, skipConfirmation, path) {
-  const operation = {};
+async function handleTargetRemoval(
+  path: string,
+  skipConfirmation: boolean,
+  getSize: boolean
+): Promise<Operation> {
+  const operation: Operation = {};
 
   if (skipConfirmation) {
     operation.size = getSize ? await getDirSize(path) : 0;
@@ -139,7 +161,7 @@ async function handleTargetRemoval(getSize, skipConfirmation, path) {
 
   return new Promise((resolve) => {
     rl.question(`Remove file/directory ${path} [y/n]? `, async (input) => {
-      if (input === 'y') {
+      if (input === "y") {
         operation.size = getSize ? await getDirSize(path) : 0;
         operation.isSuccess = await removeTargetObject(path);
       } else {
@@ -157,7 +179,7 @@ async function main() {
     const targetObjects = [];
     let totalSize = 0;
 
-    console.log('Searching for files/directories...');
+    console.log("Searching for files/directories...");
 
     for (let i = 0; i < paths.length; i++) {
       const directoryList = await fs.opendir(paths[i]);
@@ -169,9 +191,11 @@ async function main() {
           targetObjects.push({ path: fullPath });
         }
 
-        if (dirent.isDirectory()
-          && config.recurse
-          && !config.excludeList.has(dirent.name)) {
+        if (
+          dirent.isDirectory() &&
+          config.recurse &&
+          !config.excludeList.has(dirent.name)
+        ) {
           paths.push(fullPath);
         }
       }
@@ -180,18 +204,20 @@ async function main() {
     if (targetObjects.length) {
       console.log(`${targetObjects.length} target(s) found.`);
     } else {
-      console.log('Target file/directory not found.');
+      console.log("Target file/directory not found.");
     }
 
     for (const targetObject of targetObjects) {
-      const operation = await handleTargetRemoval(
-        config.getSize, config.skipConfirmation, targetObject.path
+      const operation: Operation = await handleTargetRemoval(
+        targetObject.path,
+        config.skipConfirmation,
+        config.getSize
       );
       totalSize += operation.size ? operation.size : 0;
     }
 
     if (config.getSize) {
-      console.log(`${convertBytes(totalSize)} freed.`)
+      console.log(`${convertBytes(totalSize)} freed.`);
     }
   } catch (err) {
     console.error(err);
