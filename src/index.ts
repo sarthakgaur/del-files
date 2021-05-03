@@ -7,7 +7,8 @@ import path from "path";
 // TODO Parse the command line arguments. Done.
 // TODO Add option to recursively search directories. Done.
 // TODO Prompt the user before deleting the directory. Done.
-// TODO Add support for removing any directory or file. Done.  // TODO Add support for removing multiple directories or files. Done.
+// TODO Add support for removing any directory or file. Done.
+// TODO Add support for removing multiple directories or files. Done.
 // TODO Add list of file/directory names to exclude from search. Done.
 // TODO Ouput storage space freed. Done.
 // TODO Ported the script to TypeScript. Done.
