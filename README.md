@@ -3,7 +3,8 @@ Delete files and directories from the command line.
 
 ## Installation
 1. `git clone https://github.com/sarthakgaur/del-files`
-2. `node main.mjs`
+2. `npm run build`
+3. `node out/index.js`
 
 ## Command Line Arguments
 1. `-d`: Specify the directory to search in. If no directory is specified, the `home` directory is used.
