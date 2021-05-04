@@ -177,7 +177,7 @@ async function main() {
   try {
     const config = parseArgs(process.argv.slice(2));
     const paths = [config.path];
-    const targetObjects = [];
+    const targetPaths: Array<string> = [];
     let totalSize = 0;
 
     console.log("Searching for files/directories...");
@@ -189,7 +189,7 @@ async function main() {
         const fullPath = path.join(paths[i], dirent.name);
 
         if (config.targets.has(dirent.name)) {
-          targetObjects.push({ path: fullPath });
+          targetPaths.push(fullPath);
         }
 
         if (
@@ -202,19 +202,19 @@ async function main() {
       }
     }
 
-    if (targetObjects.length) {
-      console.log(`${targetObjects.length} target(s) found.`);
+    if (targetPaths.length) {
+      console.log(`${targetPaths.length} target(s) found.`);
     } else {
       console.log("Target file/directory not found.");
     }
 
-    for (const targetObject of targetObjects) {
+    for (const targetPath of targetPaths) {
       const operation: Operation = await handleTargetRemoval(
-        targetObject.path,
+        targetPath,
         config.skipConfirmation,
         config.getSize
       );
-      totalSize += operation.size ? operation.size : 0;
+      totalSize += operation.size || 0;
     }
 
     if (config.getSize) {
