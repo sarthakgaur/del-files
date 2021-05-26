@@ -1,11 +1,13 @@
-use clap::{App, Arg, ArgMatches};
 use std::collections::HashSet;
+use std::f64;
+use std::fs;
+use std::io::{self, Write};
 use std::iter::FromIterator;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-// TODO Parse the arguments. Done
-// TODO Get list of directory.
+use clap::ArgMatches;
+
+mod clap_app;
 
 #[derive(Debug)]
 struct Config<'a> {
@@ -17,58 +19,28 @@ struct Config<'a> {
     get_size: bool,
 }
 
-fn main() {
-    let matches = App::new("del-files")
-        .version("0.2")
-        .about("Make notes from command line")
-        .arg(
-            Arg::with_name("directory")
-                .short("d")
-                .long("directory")
-                .takes_value(true)
-                .required(true)
-                .help("Specify the directory to search in."),
-        )
-        .arg(
-            Arg::with_name("targets")
-                .short("t")
-                .long("targets")
-                .value_name("FILE")
-                .takes_value(true)
-                .multiple(true)
-                .required(true)
-                .help("Files or directories to delete."),
-        )
-        .arg(
-            Arg::with_name("exclude_directories")
-                .short("e")
-                .long("exlude-directories")
-                .takes_value(true)
-                .multiple(true)
-                .help("Specify the directory to exclude from search."),
-        )
-        .arg(
-            Arg::with_name("skip_confirmation")
-                .short("y")
-                .long("skip-confirmation")
-                .help("Skip confirming when deleting file/directory."),
-        )
-        .arg(
-            Arg::with_name("recurse")
-                .short("r")
-                .long("recurse")
-                .help("Search recursively for files/directories."),
-        )
-        .arg(
-            Arg::with_name("size")
-                .short("s")
-                .long("size")
-                .help("Output the disk space freed."),
-        )
-        .get_matches();
+#[derive(Debug)]
+struct Contents {
+    files: Vec<PathBuf>,
+    dirs: Vec<PathBuf>,
+}
 
+enum PathFilterOption {
+    Append,
+    Scan,
+    Ignore,
+}
+
+fn main() {
+    let matches = clap_app::app().get_matches();
     let config = build_config(&matches);
     println!("{:#?}", config);
+
+    let del_paths = get_del_paths(&config);
+    let size = handle_deletion(&config, del_paths);
+    if config.get_size {
+        println!("{} freed.", convert_bytes(size as f64))
+    }
 }
 
 fn build_config<'a>(matches: &'a ArgMatches) -> Config<'a> {
@@ -77,7 +49,7 @@ fn build_config<'a>(matches: &'a ArgMatches) -> Config<'a> {
     let exclude = HashSet::from_iter(matches.values_of("exclude_directories").unwrap());
     let recurse = matches.is_present("recurse");
     let skip_confirmation = matches.is_present("skip_confirmation");
-    let get_size = matches.is_present("get_size");
+    let get_size = matches.is_present("size");
 
     Config {
         path,
@@ -89,40 +61,112 @@ fn build_config<'a>(matches: &'a ArgMatches) -> Config<'a> {
     }
 }
 
-fn scan() {
-    let lib_path = PathBuf::from("/home/dv/partition/programming/scheme");
-    let mut contents: Vec<String> = Vec::new();
-    let mut dirs: Vec<PathBuf> = vec![lib_path];
-
-    loop {
-        if let Some(dir) = dirs.get(0) {
-            let (mut local_contents, mut local_dirs) = get_dir_contents(dir);
-            dirs.remove(0);
-            contents.append(&mut local_contents);
-            dirs.append(&mut local_dirs);
-        } else {
-            break;
-        }
-    }
-
-    println!("{:#?}", contents);
+fn get_dir_contents(path: &Path) -> Vec<PathBuf> {
+    let entries = path.read_dir().unwrap();
+    entries.map(|entry| entry.unwrap().path()).collect()
 }
 
-fn get_dir_contents(path: &Path) -> (Vec<String>, Vec<PathBuf>) {
-    let entries = path.read_dir().unwrap();
-    let mut contents: Vec<String> = Vec::new();
-    let mut dirs: Vec<PathBuf> = Vec::new();
+fn filter_paths<F>(path: &PathBuf, callback: F) -> Vec<PathBuf>
+where
+    F: Fn(&PathBuf) -> PathFilterOption,
+{
+    let mut filtered_paths: Vec<PathBuf> = Vec::new();
+    let mut dirs: Vec<PathBuf> = vec![path.clone()];
 
-    for entry in entries {
-        let path = entry.unwrap().path();
+    while let Some(dir) = dirs.get(0) {
+        for path in get_dir_contents(dir) {
+            match callback(&path) {
+                PathFilterOption::Append => filtered_paths.push(path),
+                PathFilterOption::Scan => dirs.push(path),
+                PathFilterOption::Ignore => (),
+            }
+        }
 
-        if path.is_file() {
-            let file_name = path.file_name().unwrap();
-            contents.push(file_name.to_str().unwrap().to_owned());
-        } else if path.is_dir() {
-            dirs.push(path);
+        dirs.remove(0);
+    }
+
+    filtered_paths
+}
+
+fn get_del_paths(config: &Config) -> Vec<PathBuf> {
+    filter_paths(&config.path, &|path: &PathBuf| -> PathFilterOption {
+        let name = path.file_name().unwrap().to_str().unwrap();
+
+        if config.targets.contains(name) {
+            PathFilterOption::Append
+        } else if path.is_dir() && config.recurse && !config.exclude.contains(name) {
+            PathFilterOption::Scan
+        } else {
+            PathFilterOption::Ignore
+        }
+    })
+}
+
+fn handle_deletion(config: &Config, paths: Vec<PathBuf>) -> u64 {
+    let mut total_size = 0;
+
+    for path in paths {
+        if config.skip_confirmation {
+            total_size += if config.get_size { get_size(&path) } else { 0 };
+            remove_path(&path);
+        } else if get_confirmation(&path) {
+            total_size += if config.get_size { get_size(&path) } else { 0 };
+            remove_path(&path);
+        } else {
+            println!("Skipping file/directory {:?}", &path);
         }
     }
 
-    (contents, dirs)
+    total_size
+}
+
+fn remove_path(path: &PathBuf) {
+    if path.is_file() {
+        fs::remove_file(&path).unwrap();
+    } else if path.is_dir() {
+        fs::remove_dir_all(&path).unwrap();
+    }
+}
+
+fn get_all_files(path: &PathBuf) -> Vec<PathBuf> {
+    if path.is_file() {
+        vec![path.clone()]
+    } else {
+        filter_paths(path, |path| -> PathFilterOption {
+            if path.is_dir() {
+                PathFilterOption::Scan
+            } else {
+                PathFilterOption::Append
+            }
+        })
+    }
+}
+
+fn get_size(path: &PathBuf) -> u64 {
+    get_all_files(path)
+        .iter()
+        .fold(0, |acc, path| acc + fs::metadata(path).unwrap().len())
+}
+
+fn convert_bytes(bytes: f64) -> String {
+    const SIZES: [&str; 5] = ["Bytes", "KB", "MB", "GB", "TB"];
+
+    if bytes == 0f64 {
+        "0 Bytes".to_owned()
+    } else {
+        let num = bytes.log(f64::consts::E) / 1024f64.log(f64::consts::E);
+        let i = num.trunc() as i32;
+        format!("{:.1} {}", (bytes / 1024f64.powi(i)), SIZES[i as usize])
+    }
+}
+
+fn get_confirmation(path: &PathBuf) -> bool {
+    let mut stdout = io::stdout();
+    write!(&mut stdout, "Delete file/directory {:?} [y/n]? ", &path);
+    stdout.flush().unwrap();
+
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    input.trim().to_lowercase() == "y"
 }
