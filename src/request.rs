@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Error;
-use clap::{ArgMatches, Values};
+use clap::ArgMatches;
 use fehler::throws;
 
 use crate::utils::{self, PathFilterOption};
@@ -27,7 +27,7 @@ impl<'a> Request<'a> {
         let get_size = matches.is_present("size");
         let exclude = matches
             .values_of("exclude_directories")
-            .unwrap_or(Values::default())
+            .unwrap_or_default()
             .collect();
 
         Request {
