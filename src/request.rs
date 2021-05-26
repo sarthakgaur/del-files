@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{ArgMatches, Values};
 use anyhow::Error;
+use clap::{ArgMatches, Values};
 use fehler::throws;
 
 use crate::utils::{self, PathFilterOption};
@@ -22,10 +22,13 @@ impl<'a> Request<'a> {
     pub fn new(matches: &'a ArgMatches) -> Request<'a> {
         let path = PathBuf::from(matches.value_of("directory").unwrap());
         let targets = matches.values_of("targets").unwrap().collect();
-        let exclude = matches.values_of("exclude_directories").unwrap_or(Values::default()).collect();
         let recurse = matches.is_present("recurse");
         let skip_confirmation = matches.is_present("skip_confirmation");
         let get_size = matches.is_present("size");
+        let exclude = matches
+            .values_of("exclude_directories")
+            .unwrap_or(Values::default())
+            .collect();
 
         Request {
             path,
