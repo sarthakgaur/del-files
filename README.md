@@ -25,6 +25,6 @@ Delete files and directories from the command line.
 
 ## Example Usage
 
-Command: `node main.mjs node_modules package-lock.json -d ../local_chat/ -r -e .git public env`
+Command: `del-files -d ../local_chat/ -t node_modules temp -r -e .git public env`
 
-This command will search for `node_modules` and `package-lock.json` in the `local_chat` directory recursively, and then delete them after confirming from the user. The program will exclude `.git`, `public`, and `env` directories from the search.
+This command will search for `node_modules` and `temp` in the `local_chat` directory recursively, and then delete them after confirming from the user. The program will exclude `.git`, `public`, and `env` directories from the search.
