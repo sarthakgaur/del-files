@@ -12,9 +12,9 @@ pub enum PathFilterOption {
 }
 
 #[throws(Error)]
-pub fn filter_paths<F>(path: &Path, callback: F) -> Vec<PathBuf>
+pub fn filter_paths<F>(path: &Path, mut callback: F) -> Vec<PathBuf>
 where
-    F: Fn(&Path) -> PathFilterOption,
+    F: FnMut(&Path) -> PathFilterOption,
 {
     let mut filtered_paths: Vec<PathBuf> = Vec::new();
     let mut dirs: Vec<PathBuf> = vec![path.to_path_buf()];
@@ -44,25 +44,23 @@ pub fn remove_path(path: &Path) {
 }
 
 #[throws(Error)]
-pub fn get_all_files(path: &Path) -> Vec<PathBuf> {
+pub fn get_size(path: &Path) -> u64 {
     if path.is_file() {
-        vec![path.to_path_buf()]
+        fs::metadata(path)?.len()
     } else {
-        filter_paths(path, |path| -> PathFilterOption {
+        let mut size: u64 = 0;
+
+        filter_paths(path, |path: &Path| -> PathFilterOption {
             if path.is_dir() {
                 PathFilterOption::Scan
             } else {
-                PathFilterOption::Append
+                size += fs::metadata(path).unwrap().len();
+                PathFilterOption::Ignore
             }
-        })?
-    }
-}
+        })?;
 
-#[throws(Error)]
-pub fn get_size(path: &Path) -> u64 {
-    get_all_files(path)?
-        .iter()
-        .fold(0, |acc, path| acc + fs::metadata(path).unwrap().len())
+        size
+    }
 }
 
 pub fn convert_bytes(bytes: f64) -> String {
