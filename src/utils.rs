@@ -67,6 +67,6 @@ pub fn convert_bytes(bytes: f64) -> String {
     } else {
         let num = bytes.log(f64::consts::E) / 1024f64.log(f64::consts::E);
         let i = num.trunc() as i32;
-        format!("{:.1} {}", (bytes / 1024f64.powi(i)), SIZES[i as usize])
+        format!("{:.1} {}", bytes / 1024f64.powi(i), SIZES[i as usize])
     }
 }

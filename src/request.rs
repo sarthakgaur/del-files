@@ -47,7 +47,7 @@ impl<'a> Request<'a> {
         utils::process_paths(&self.path, |path| {
             let name = path.file_name().unwrap().to_str().unwrap();
 
-            if self.targets.contains(name) && self.get_confirmation(path)? {
+            if self.targets.contains(name) && self.get_confirmation(&path)? {
                 if self.get_size {
                     total_size += utils::get_size(&path)?;
                 }
