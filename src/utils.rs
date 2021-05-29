@@ -3,35 +3,31 @@ use std::f64;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use fehler::throws;
 
-pub enum PathFilterOption {
-    Append,
+pub enum ProcessPathOption {
     Scan,
-    Ignore,
+    None,
 }
 
 #[throws(Error)]
-pub fn filter_paths<F>(path: &Path, mut callback: F) -> Vec<PathBuf>
+pub fn process_paths<F>(path: &Path, mut callback: F)
 where
-    F: FnMut(&Path) -> PathFilterOption,
+    F: FnMut(&Path) -> Result<ProcessPathOption>,
 {
-    let mut filtered_paths: Vec<PathBuf> = Vec::new();
     let mut dirs: VecDeque<PathBuf> = VecDeque::new();
     dirs.push_back(path.to_path_buf());
 
     while let Some(dir) = dirs.pop_front() {
-        for path in get_dir_contents(&dir)? {
-            match callback(&path) {
-                PathFilterOption::Append => filtered_paths.push(path),
-                PathFilterOption::Scan => dirs.push_back(path),
-                PathFilterOption::Ignore => (),
+        for entry in dir.read_dir()? {
+            let entry_path = entry?.path();
+
+            if let ProcessPathOption::Scan = callback(&entry_path)? {
+                dirs.push_back(entry_path);
             }
         }
     }
-
-    filtered_paths
 }
 
 #[throws(Error)]
@@ -50,12 +46,12 @@ pub fn get_size(path: &Path) -> u64 {
     } else {
         let mut size: u64 = 0;
 
-        filter_paths(path, |path: &Path| -> PathFilterOption {
+        process_paths(path, |path| {
             if path.is_dir() {
-                PathFilterOption::Scan
+                Ok(ProcessPathOption::Scan)
             } else {
-                size += fs::metadata(path).unwrap().len();
-                PathFilterOption::Ignore
+                size += fs::metadata(path)?.len();
+                Ok(ProcessPathOption::None)
             }
         })?;
 
@@ -73,10 +69,4 @@ pub fn convert_bytes(bytes: f64) -> String {
         let i = num.trunc() as i32;
         format!("{:.1} {}", (bytes / 1024f64.powi(i)), SIZES[i as usize])
     }
-}
-
-#[throws(Error)]
-fn get_dir_contents(path: &Path) -> Vec<PathBuf> {
-    let entries = path.read_dir()?;
-    entries.map(|entry| entry.unwrap().path()).collect()
 }
