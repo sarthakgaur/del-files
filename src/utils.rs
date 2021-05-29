@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::f64;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,18 +18,17 @@ where
     F: FnMut(&Path) -> PathFilterOption,
 {
     let mut filtered_paths: Vec<PathBuf> = Vec::new();
-    let mut dirs: Vec<PathBuf> = vec![path.to_path_buf()];
+    let mut dirs: VecDeque<PathBuf> = VecDeque::new();
+    dirs.push_back(path.to_path_buf());
 
-    while let Some(dir) = dirs.get(0) {
-        for path in get_dir_contents(dir)? {
+    while let Some(dir) = dirs.pop_front() {
+        for path in get_dir_contents(&dir)? {
             match callback(&path) {
                 PathFilterOption::Append => filtered_paths.push(path),
-                PathFilterOption::Scan => dirs.push(path),
+                PathFilterOption::Scan => dirs.push_back(path),
                 PathFilterOption::Ignore => (),
             }
         }
-
-        dirs.remove(0);
     }
 
     filtered_paths
