@@ -1,6 +1,6 @@
 [package]
-name = "del-files"
-version = "0.1.0"
+name = "sdel"
+version = "0.2.0"
 authors = ["sarthakgaur <75014896+sarthakgaur@users.noreply.github.com>"]
 edition = "2018"
 
