@@ -53,7 +53,11 @@ impl<'a> Request<'a> {
                 }
 
                 utils::remove_path(&path)?;
-            } else if path.is_dir() && self.recurse && !self.exclude.contains(name) {
+            } else if path.is_dir()
+                && self.recurse
+                && !self.exclude.contains(name)
+                && !self.targets.contains(name)
+            {
                 return Ok(ProcessPathOption::Scan);
             }
 
